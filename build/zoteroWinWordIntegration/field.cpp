@@ -29,7 +29,6 @@
 #include "zoteroWinWordIntegration.h"
 
 static COleVariant covOptional((long)DISP_E_PARAMNOTFOUND, VT_ERROR);
-static COleVariant covTrue((short)TRUE), covFalse((short)FALSE);
 static wchar_t* FIELD_PREFIXES[] = {L" ADDIN ZOTERO_", L" CSL_", NULL};
 static wchar_t* BOOKMARK_PREFIXES[] = {L"ZOTERO_", L"CSL_", NULL};
 
@@ -342,12 +341,12 @@ statusCode __stdcall setText(field_t* field, const wchar_t string[], bool isRich
 			toDelete.Collapse(0);
 			CRange comDupRange = field->comContentRange.get_Duplicate();
 			comDupRange.MoveEnd(1, -1);
-			comDupRange.InsertFile(getTemporaryFilePath(), &covOptional, &covFalse, &covFalse, &covFalse);
+			insertTemporaryFile(&comDupRange);
 			toDelete.MoveStart(1, -1);
 			toDelete.put_Text(L"");
 		} else {
 			field->comContentRange.put_Text(L"");
-			field->comContentRange.InsertFile(getTemporaryFilePath(), &covOptional, &covFalse, &covFalse, &covFalse);
+			insertTemporaryFile(&field->comContentRange);
 
 			if(field->comBookmark) {
 				field->comContentRange = field->comBookmark.get_Range();
@@ -519,11 +518,11 @@ statusCode convertToNoteType(field_t* field, short toNoteType) {
 			// Create a new note and get its range
 			if(toNoteType == NOTE_FOOTNOTE) {
 				CFootnotes notes = (field->doc)->comDoc.get_Footnotes();
-				CFootnote note = notes.Add(comRange, covOptional, covOptional);
+				CFootnote note = notes.Add(comRange, covOptional, COleVariant(L""));
 				comRange = note.get_Range();
 			} else if(toNoteType == NOTE_ENDNOTE) {
 				CEndnotes notes = (field->doc)->comDoc.get_Endnotes();
-				CEndnote note = notes.Add(comRange, covOptional, covOptional);
+				CEndnote note = notes.Add(comRange, covOptional, COleVariant(L""));
 				comRange = note.get_Range();
 			}
 		

@@ -218,6 +218,7 @@ void throwError(const std::exception* error, const char function[], const char f
 HANDLE getTemporaryFile(void);
 void deleteTemporaryFile(void);
 wchar_t* getTemporaryFilePath(void);
+void insertTemporaryFile(CRange* range);
 
 CString generateRandomString(unsigned int length);
 

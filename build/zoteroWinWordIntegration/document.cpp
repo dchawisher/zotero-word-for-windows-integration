@@ -29,7 +29,7 @@
 #include "zoteroWinWordIntegration.h"
 
 static COleVariant covOptional((long)DISP_E_PARAMNOTFOUND, VT_ERROR);
-static COleVariant covTrue((short)TRUE), covFalse((short)FALSE);
+static COleVariant covTrue((short)VARIANT_TRUE, VT_BOOL);
 COleMessageFilter *comFilter = NULL;
 unsigned int comFilterRefs = 0;
 
@@ -500,7 +500,7 @@ statusCode __stdcall insertField(document_t *doc, const wchar_t fieldType[],
 		// If inserting a note citation in the main story, we need to make a new note
 		if(noteType == NOTE_FOOTNOTE) {
 			CFootnotes notes = doc->comDoc.get_Footnotes();
-			CFootnote note = notes.Add(insertRange, covOptional, covOptional);
+			CFootnote note = notes.Add(insertRange, covOptional, COleVariant(L""));
 			// Move cursor back to main text
 			CRange referenceRange = note.get_Reference();
 			CRange dupRange = referenceRange.get_Duplicate();
@@ -510,7 +510,7 @@ statusCode __stdcall insertField(document_t *doc, const wchar_t fieldType[],
 			insertRange = note.get_Range();
 		} else if(noteType == NOTE_ENDNOTE) {
 			CEndnotes notes = doc->comDoc.get_Endnotes();
-			CEndnote note = notes.Add(insertRange, covOptional, covOptional);
+			CEndnote note = notes.Add(insertRange, covOptional, COleVariant(L""));
 			// Move cursor back to main text
 			CRange referenceRange = note.get_Reference();
 			CRange dupRange = referenceRange.get_Duplicate();
@@ -930,12 +930,12 @@ statusCode __stdcall insertText(document_t *doc, const wchar_t htmlString[]) {
 		// if text has to be inserted into the doc we have to re-insert a note here.
 		if (doc->insertTextIntoNote == NOTE_FOOTNOTE) {
 			CFootnotes notes = doc->comDoc.get_Footnotes();
-			CFootnote note = notes.Add(insertRange, covOptional, covOptional);
+			CFootnote note = notes.Add(insertRange, covOptional, COleVariant(L""));
 			insertRange = note.get_Range();
 		}
 		else {
 			CEndnotes notes = doc->comDoc.get_Endnotes();
-			CEndnote note = notes.Add(insertRange, covOptional, covOptional);
+			CEndnote note = notes.Add(insertRange, covOptional, COleVariant(L""));
 			insertRange = note.get_Range();
 		}
 	}
@@ -966,7 +966,7 @@ statusCode __stdcall insertText(document_t *doc, const wchar_t htmlString[]) {
 	toDelete.Collapse(0);
 	CRange comDupRange = insertRange.get_Duplicate();
 	comDupRange.MoveEnd(1, -1);
-	comDupRange.InsertFile(getTemporaryFilePath(), &covOptional, &covFalse, &covFalse, &covFalse);
+	insertTemporaryFile(&comDupRange);
 	toDelete.MoveStart(1, -1);
 	toDelete.put_Text(L"");
 	
@@ -1030,7 +1030,7 @@ statusCode __stdcall convertPlaceholdersToFields(document_t *doc, const wchar_t*
 				// If inserting a note citation in the main story, we need to make a new note
 				if (noteType == NOTE_FOOTNOTE) {
 					CFootnotes notes = doc->comDoc.get_Footnotes();
-					CFootnote note = notes.Add(insertRange, covOptional, covOptional);
+					CFootnote note = notes.Add(insertRange, covOptional, COleVariant(L""));
 					// Move cursor back to main text
 					CRange referenceRange = note.get_Reference();
 					CRange dupRange = referenceRange.get_Duplicate();
@@ -1041,7 +1041,7 @@ statusCode __stdcall convertPlaceholdersToFields(document_t *doc, const wchar_t*
 				}
 				else if (noteType == NOTE_ENDNOTE) {
 					CEndnotes notes = doc->comDoc.get_Endnotes();
-					CEndnote note = notes.Add(insertRange, covOptional, covOptional);
+					CEndnote note = notes.Add(insertRange, covOptional, COleVariant(L""));
 					// Move cursor back to main text
 					CRange referenceRange = note.get_Reference();
 					CRange dupRange = referenceRange.get_Duplicate();
@@ -1170,7 +1170,7 @@ statusCode insertFieldRaw(document_t *doc, const wchar_t fieldType[],
 	if(wcscmp(fieldType, L"Field") == 0) {
 		CFields comFields = doc->comDoc.get_Fields();
 		// Creating the field as a wdFieldQuote type, since creating as a wdFieldAddin field screws up the ranges
-		CField field = comFields.Add(comWhere, COleVariant((short) 35), COleVariant(FIELD_PLACEHOLDER), COleVariant((short)true));
+		CField field = comFields.Add(comWhere, COleVariant((short) 35), COleVariant(FIELD_PLACEHOLDER), covTrue);
 		return initField(doc, field, -1, true, returnValue);
 	}
 	

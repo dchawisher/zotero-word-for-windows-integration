@@ -104,6 +104,41 @@ void __stdcall freeData(void* ptr) {
 	free(ptr);
 }
 
+// Bypass the generated CRange::InsertFile wrapper, which uses MFC
+// COleDispatchDriver::InvokeHelper with VTS_PVARIANT for optional arguments.
+// After the June 2026 Word update, that path causes Word to show the Convert
+// File dialog despite ConfirmConversions being false. Calling IDispatch::Invoke
+// directly with explicit VARIANTARGs avoids the issue.
+// Reported to Microsoft at:
+// https://developercommunity.visualstudio.com/t/MFC-COleDispatchDriver::InvokeHelper-mis/11104909?port=1025&fsid=c85db6e7-2f0e-4e87-b5b6-374495d25c40
+void insertTemporaryFile(CRange* range) {
+	VARIANTARG args[5];
+	for(int i = 0; i < 5; i++) {
+		VariantInit(&args[i]);
+	}
+	// IDispatch expects arguments in reverse order.
+	args[0].vt = VT_BOOL;
+	args[0].boolVal = VARIANT_FALSE; // Attachment
+	args[1].vt = VT_BOOL;
+	args[1].boolVal = VARIANT_FALSE; // Link
+	args[2].vt = VT_BOOL;
+	args[2].boolVal = VARIANT_FALSE; // ConfirmConversions
+	args[3].vt = VT_ERROR;
+	args[3].scode = DISP_E_PARAMNOTFOUND; // Range
+	args[4].vt = VT_BSTR;
+	args[4].bstrVal = SysAllocString(getTemporaryFilePath()); // FileName
+
+	DISPPARAMS params = { args, NULL, 5, 0 };
+	HRESULT hr = range->m_lpDispatch->Invoke(0x7b, IID_NULL, LOCALE_USER_DEFAULT,
+		DISPATCH_METHOD, &params, NULL, NULL, NULL);
+	for(int i = 0; i < 5; i++) {
+		VariantClear(&args[i]);
+	}
+	if(FAILED(hr)) {
+		AfxThrowOleException(hr);
+	}
+}
+
 // Generates a random string
 CString generateRandomString(unsigned int length) {
 	// seed random number generator
