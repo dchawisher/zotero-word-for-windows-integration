@@ -28,23 +28,24 @@
 
 #include "zoteroWinWordIntegration.h"
 
+#include <vector>
+
 static COleVariant covOptional((long)DISP_E_PARAMNOTFOUND, VT_ERROR);
-static COleVariant covTrue((short)VARIANT_TRUE, VT_BOOL);
 static wchar_t* FIELD_PREFIXES[] = {L" ADDIN ZOTERO_", L" CSL_", NULL};
 static wchar_t* BOOKMARK_PREFIXES[] = {L"ZOTERO_", L"CSL_", NULL};
-static const wchar_t* CAPS_STYLE_NAME = L"Caps";
 static const long WD_STYLE_TYPE_CHARACTER = 2;
+static const long WD_STYLE_DEFAULT_PARAGRAPH_FONT = -66;
 static const short WD_FIELD_TOA_ENTRY = 74;
 static const long WD_COLLAPSE_END = 0;
-static const wchar_t* TOA_LONG_TEXT_PLACEHOLDER = L"\xE000";
 
 statusCode isWholeNote(field_t* field, bool* returnValue);
 statusCode setTextAndNoteLocations(field_t* field);
 
-static bool getCapsStyleSmallCaps(document_t *doc, bool *returnValue) {
+static bool getCapsStyleSmallCaps(document_t *doc, const wchar_t smallCapsStyleName[], bool *returnValue) {
+	if(!smallCapsStyleName || !smallCapsStyleName[0]) return false;
 	try {
 		CStyles styles = doc->comDoc.get_Styles();
-		CStyle style(styles.Item(CAPS_STYLE_NAME));
+		CStyle style(styles.Item(smallCapsStyleName));
 		if(style.get_Type() != WD_STYLE_TYPE_CHARACTER) return false;
 		CFont0 styleFont = style.get_Font();
 		*returnValue = styleFont.get_SmallCaps() != 0;
@@ -59,20 +60,23 @@ static bool getCapsStyleSmallCaps(document_t *doc, bool *returnValue) {
 	}
 }
 
-static void applyCapsStyleToRange(CRange *baseRange, long start, long end, bool capsStyleUsesSmallCaps) {
+static void applyCapsStyleToRange(CRange *baseRange, long start, long end,
+								  const wchar_t smallCapsStyleName[],
+								  bool capsStyleUsesSmallCaps) {
 	if(start >= end) return;
 	CRange runRange = baseRange->get_Duplicate();
 	runRange.SetRange(start, end);
-	runRange.put_Style(CAPS_STYLE_NAME);
+	runRange.put_Style(smallCapsStyleName);
 	if(!capsStyleUsesSmallCaps) {
 		CFont0 runFont = runRange.get_Font();
 		runFont.put_SmallCaps(0);
 	}
 }
 
-static void applyCapsStyleToSmallCaps(document_t *doc, CRange *range) {
+static void applyCapsStyleToSmallCaps(document_t *doc, CRange *range,
+									  const wchar_t smallCapsStyleName[]) {
 	bool capsStyleUsesSmallCaps = false;
-	if(!getCapsStyleSmallCaps(doc, &capsStyleUsesSmallCaps)) return;
+	if(!getCapsStyleSmallCaps(doc, smallCapsStyleName, &capsStyleUsesSmallCaps)) return;
 
 	long start = range->get_Start();
 	long end = range->get_End();
@@ -88,34 +92,18 @@ static void applyCapsStyleToSmallCaps(document_t *doc, CRange *range) {
 			runStart = pos;
 		}
 		else if(!isSmallCaps && runStart != -1) {
-			applyCapsStyleToRange(range, runStart, pos, capsStyleUsesSmallCaps);
+			applyCapsStyleToRange(range, runStart, pos, smallCapsStyleName, capsStyleUsesSmallCaps);
 			runStart = -1;
 		}
 	}
 
 	if(runStart != -1) {
-		applyCapsStyleToRange(range, runStart, end, capsStyleUsesSmallCaps);
+		applyCapsStyleToRange(range, runStart, end, smallCapsStyleName, capsStyleUsesSmallCaps);
 	}
 }
 
-static CString escapeTOAFieldArgument(const wchar_t* value) {
-	CString escaped;
-	for(const wchar_t* p = value; p && *p; p++) {
-		if(*p == L'\\' || *p == L'"') {
-			escaped.AppendChar(L'\\');
-			escaped.AppendChar(*p);
-		}
-		else if(*p == L'\r' || *p == L'\n') {
-			escaped.AppendChar(L' ');
-		}
-		else {
-			escaped.AppendChar(*p);
-		}
-	}
-	return escaped;
-}
-
-static void insertRTFIntoRange(document_t *doc, CRange *range, const wchar_t string[]) {
+static void insertRTFIntoRange(document_t *doc, CRange *range, const wchar_t string[],
+							   const wchar_t smallCapsStyleName[] = L"") {
 	char* utf8String;
 	int nBytes = WideCharToMultiByte(CP_UTF8, 0, string, -1, NULL, 0, NULL, NULL);
 	utf8String = new char[nBytes];
@@ -142,7 +130,7 @@ static void insertRTFIntoRange(document_t *doc, CRange *range, const wchar_t str
 	}
 
 	if(wcsstr(string, L"\\scaps")) {
-		applyCapsStyleToSmallCaps(doc, range);
+		applyCapsStyleToSmallCaps(doc, range, smallCapsStyleName);
 	}
 }
 
@@ -157,38 +145,320 @@ static void clearTOAMarks(CRange *range) {
 	}
 }
 
+struct TOAFormatState {
+	bool bold;
+	bool italic;
+	bool underline;
+	bool smallCaps;
+	bool superscript;
+	bool subscript;
+
+	TOAFormatState() :
+		bold(false),
+		italic(false),
+		underline(false),
+		smallCaps(false),
+		superscript(false),
+		subscript(false) {}
+};
+
+struct TOAFormatRun {
+	long start;
+	long end;
+	TOAFormatState state;
+};
+
+struct TOAFormattedText {
+	CString text;
+	std::vector<TOAFormatRun> runs;
+};
+
+static bool sameTOAFormatState(const TOAFormatState& a, const TOAFormatState& b) {
+	return a.bold == b.bold
+		&& a.italic == b.italic
+		&& a.underline == b.underline
+		&& a.smallCaps == b.smallCaps
+		&& a.superscript == b.superscript
+		&& a.subscript == b.subscript;
+}
+
+static bool hasTOAFormat(const TOAFormatState& state) {
+	return state.bold || state.italic || state.underline || state.smallCaps
+		|| state.superscript || state.subscript;
+}
+
+static void appendTOAChar(TOAFormattedText *formatted, wchar_t ch, const TOAFormatState& state) {
+	long pos = formatted->text.GetLength();
+	formatted->text.AppendChar(ch);
+	if(!hasTOAFormat(state)) return;
+
+	if(!formatted->runs.empty()) {
+		TOAFormatRun& lastRun = formatted->runs.back();
+		if(lastRun.end == pos && sameTOAFormatState(lastRun.state, state)) {
+			lastRun.end++;
+			return;
+		}
+	}
+
+	TOAFormatRun run;
+	run.start = pos;
+	run.end = pos + 1;
+	run.state = state;
+	formatted->runs.push_back(run);
+}
+
+static TOAFormattedText parseTOARTF(const wchar_t string[]) {
+	TOAFormattedText formatted;
+	TOAFormatState state;
+	std::vector<TOAFormatState> stack;
+	long length = wcslen(string);
+
+	for(long i = 0; i < length; i++) {
+		wchar_t ch = string[i];
+		if(ch == L'{') {
+			stack.push_back(state);
+			continue;
+		}
+		if(ch == L'}') {
+			if(!stack.empty()) {
+				state = stack.back();
+				stack.pop_back();
+			}
+			continue;
+		}
+		if(ch != L'\\') {
+			appendTOAChar(&formatted, ch, state);
+			continue;
+		}
+
+		if(i + 1 >= length) break;
+		wchar_t next = string[++i];
+		if(next == L'\\' || next == L'{' || next == L'}') {
+			appendTOAChar(&formatted, next, state);
+			continue;
+		}
+
+		long controlStart = i;
+		while(i < length && ((string[i] >= L'a' && string[i] <= L'z') || (string[i] >= L'A' && string[i] <= L'Z'))) {
+			i++;
+		}
+		CString control;
+		control.SetString(string + controlStart, i - controlStart);
+
+		bool negative = false;
+		if(i < length && string[i] == L'-') {
+			negative = true;
+			i++;
+		}
+
+		bool hasNumber = false;
+		long number = 0;
+		while(i < length && string[i] >= L'0' && string[i] <= L'9') {
+			hasNumber = true;
+			number = number * 10 + (string[i] - L'0');
+			i++;
+		}
+		if(negative) number = -number;
+
+		if(i < length && string[i] == L' ') {
+			// Control-word delimiter, not literal text.
+		}
+		else {
+			i--;
+		}
+
+		if(control == L"rtf" || control == L"ansi" || control == L"deff"
+				|| control == L"uc" || control == L"pard" || control == L"plain") {
+			continue;
+		}
+		if(control == L"i") {
+			state.italic = !hasNumber || number != 0;
+			continue;
+		}
+		if(control == L"b") {
+			state.bold = !hasNumber || number != 0;
+			continue;
+		}
+		if(control == L"ul") {
+			state.underline = !hasNumber || number != 0;
+			continue;
+		}
+		if(control == L"ulnone") {
+			state.underline = false;
+			continue;
+		}
+		if(control == L"scaps") {
+			state.smallCaps = !hasNumber || number != 0;
+			continue;
+		}
+		if(control == L"super") {
+			state.superscript = true;
+			state.subscript = false;
+			continue;
+		}
+		if(control == L"sub") {
+			state.subscript = true;
+			state.superscript = false;
+			continue;
+		}
+		if(control == L"nosupersub") {
+			state.superscript = false;
+			state.subscript = false;
+			continue;
+		}
+		if(control == L"tab") {
+			appendTOAChar(&formatted, L'\t', state);
+			continue;
+		}
+		if(control == L"line" || control == L"par") {
+			appendTOAChar(&formatted, L'\v', state);
+			continue;
+		}
+		if(control == L"u" && hasNumber) {
+			appendTOAChar(&formatted, (wchar_t) number, state);
+			if(i + 2 < length && string[i + 1] == L'{' && string[i + 2] == L'}') {
+				i += 2;
+			}
+			continue;
+		}
+	}
+
+	return formatted;
+}
+
+static void appendFieldArgument(const CString& text, CString *fieldCode, std::vector<long> *offsets) {
+	for(long i = 0; i < text.GetLength(); i++) {
+		wchar_t ch = text[i];
+		offsets->push_back(fieldCode->GetLength());
+		if(ch == L'\\' || ch == L'"') {
+			fieldCode->AppendChar(L'\\');
+		}
+		fieldCode->AppendChar(ch);
+	}
+}
+
+static void applyCapsFontDirectly(document_t *doc, CRange *range, const wchar_t smallCapsStyleName[]) {
+	if(!smallCapsStyleName || !smallCapsStyleName[0]) {
+		CFont0 font = range->get_Font();
+		font.put_SmallCaps(1);
+		return;
+	}
+	try {
+		CStyles styles = doc->comDoc.get_Styles();
+		CStyle capsStyle(styles.Item(smallCapsStyleName));
+		if(capsStyle.get_Type() != WD_STYLE_TYPE_CHARACTER) {
+			CFont0 font = range->get_Font();
+			font.put_SmallCaps(1);
+			return;
+		}
+
+		CStyle defaultStyle(styles.Item(WD_STYLE_DEFAULT_PARAGRAPH_FONT));
+		CFont0 capsFont = capsStyle.get_Font();
+		CFont0 defaultFont = defaultStyle.get_Font();
+		CFont0 rangeFont = range->get_Font();
+
+		CString name = capsFont.get_Name();
+		if(!name.IsEmpty() && name != defaultFont.get_Name()) rangeFont.put_Name(name);
+		CString nameAscii = capsFont.get_NameAscii();
+		if(!nameAscii.IsEmpty() && nameAscii != defaultFont.get_NameAscii()) rangeFont.put_NameAscii(nameAscii);
+		CString nameOther = capsFont.get_NameOther();
+		if(!nameOther.IsEmpty() && nameOther != defaultFont.get_NameOther()) rangeFont.put_NameOther(nameOther);
+		CString nameFarEast = capsFont.get_NameFarEast();
+		if(!nameFarEast.IsEmpty() && nameFarEast != defaultFont.get_NameFarEast()) rangeFont.put_NameFarEast(nameFarEast);
+
+		float size = capsFont.get_Size();
+		if(size > 0 && size != defaultFont.get_Size()) rangeFont.put_Size(size);
+		float spacing = capsFont.get_Spacing();
+		if(spacing != defaultFont.get_Spacing()) rangeFont.put_Spacing(spacing);
+		long scaling = capsFont.get_Scaling();
+		if(scaling > 0 && scaling != defaultFont.get_Scaling()) rangeFont.put_Scaling(scaling);
+		long position = capsFont.get_Position();
+		if(position != defaultFont.get_Position()) rangeFont.put_Position(position);
+		float kerning = capsFont.get_Kerning();
+		if(kerning != defaultFont.get_Kerning()) rangeFont.put_Kerning(kerning);
+
+		if(capsFont.get_Bold() != defaultFont.get_Bold()) rangeFont.put_Bold(capsFont.get_Bold());
+		if(capsFont.get_Italic() != defaultFont.get_Italic()) rangeFont.put_Italic(capsFont.get_Italic());
+		if(capsFont.get_SmallCaps() != defaultFont.get_SmallCaps()) rangeFont.put_SmallCaps(capsFont.get_SmallCaps());
+		if(capsFont.get_AllCaps() != defaultFont.get_AllCaps()) rangeFont.put_AllCaps(capsFont.get_AllCaps());
+	}
+	catch(CException* e) {
+		e->Delete();
+		CFont0 font = range->get_Font();
+		font.put_SmallCaps(1);
+	}
+	catch(...) {
+		CFont0 font = range->get_Font();
+		font.put_SmallCaps(1);
+	}
+}
+
+static void applyTOAFormatting(document_t *doc, CField *toaField, const CString& fieldCode,
+							   const TOAFormattedText& formatted,
+							   const std::vector<long>& offsets,
+							   const wchar_t smallCapsStyleName[]) {
+	if(offsets.empty()) return;
+
+	CRange codeRange = toaField->get_Code();
+	CString codeText = codeRange.get_Text();
+	long base = codeText.Find(fieldCode);
+	if(base == -1) return;
+
+	long codeStart = codeRange.get_Start() + base;
+	for(size_t i = 0; i < formatted.runs.size(); i++) {
+		TOAFormatRun run = formatted.runs[i];
+		if(run.start < 0 || run.end <= run.start || run.end > (long) offsets.size()) continue;
+
+		CRange runRange = codeRange.get_Duplicate();
+		runRange.SetRange(codeStart + offsets[run.start], codeStart + offsets[run.end - 1] + 1);
+		CFont0 font = runRange.get_Font();
+		if(run.state.bold) font.put_Bold(1);
+		if(run.state.italic) font.put_Italic(1);
+		if(run.state.underline) runRange.put_Underline(1);
+		if(run.state.superscript) font.put_Superscript(1);
+		if(run.state.subscript) font.put_Subscript(1);
+		if(run.state.smallCaps) applyCapsFontDirectly(doc, &runRange, smallCapsStyleName);
+	}
+}
+
+static void insertTOAField(document_t *doc, CRange *range, const wchar_t shortCitation[],
+						   const wchar_t longCitation[], unsigned short category,
+						   bool isInitial, const wchar_t smallCapsStyleName[]) {
+	TOAFormattedText shortText = parseTOARTF(shortCitation ? shortCitation : L"");
+	TOAFormattedText longText = parseTOARTF(longCitation ? longCitation : L"");
+
+	CString fieldCode;
+	std::vector<long> shortOffsets;
+	std::vector<long> longOffsets;
+
+	if(isInitial && !longText.text.IsEmpty()) {
+		fieldCode.Append(L"\\l \"");
+		appendFieldArgument(longText.text, &fieldCode, &longOffsets);
+		fieldCode.Append(L"\" ");
+	}
+	fieldCode.Append(L"\\s \"");
+	appendFieldArgument(shortText.text, &fieldCode, &shortOffsets);
+	fieldCode.Append(L"\" ");
+	CString categoryCode;
+	categoryCode.Format(L"\\c %d", category);
+	fieldCode.Append(categoryCode);
+
+	CFields fields = range->get_Fields();
+	CField toaField = fields.Add(*range, COleVariant((short) WD_FIELD_TOA_ENTRY),
+		COleVariant(fieldCode), COleVariant((short) VARIANT_FALSE, VT_BOOL));
+
+	applyTOAFormatting(doc, &toaField, fieldCode, shortText, shortOffsets, smallCapsStyleName);
+	applyTOAFormatting(doc, &toaField, fieldCode, longText, longOffsets, smallCapsStyleName);
+}
+
 static void insertTOAMark(field_t* field, const wchar_t shortCitation[],
 						  const wchar_t longCitation[], unsigned short category,
-						  bool isInitial) {
+						  bool isInitial, const wchar_t smallCapsStyleName[]) {
 	CRange insertRange = field->comContentRange.get_Duplicate();
 	insertRange.Collapse(WD_COLLAPSE_END);
 
-	CString escapedShortCitation = escapeTOAFieldArgument(shortCitation);
-	CString code;
-	if(isInitial && longCitation && longCitation[0]) {
-		code.Format(L"\\l \"%s\" \\s \"%s\" \\c %u",
-			TOA_LONG_TEXT_PLACEHOLDER, escapedShortCitation.GetString(), category);
-	}
-	else {
-		code.Format(L"\\s \"%s\" \\c %u", escapedShortCitation.GetString(), category);
-	}
-
-	CFields fields = field->doc->comDoc.get_Fields();
-	CField toaField = fields.Add(insertRange, COleVariant(WD_FIELD_TOA_ENTRY), COleVariant(code.GetString()), covTrue);
-
-	if(isInitial && longCitation && longCitation[0]) {
-		CRange codeRange = toaField.get_Code();
-		CString codeText = codeRange.get_Text();
-		int placeholderLocation = codeText.Find(TOA_LONG_TEXT_PLACEHOLDER);
-		if(placeholderLocation != -1) {
-			CRange longTextRange = codeRange.get_Duplicate();
-			longTextRange.SetRange(
-				codeRange.get_Start() + placeholderLocation,
-				codeRange.get_Start() + placeholderLocation + (long) wcslen(TOA_LONG_TEXT_PLACEHOLDER)
-			);
-			insertRTFIntoRange(field->doc, &longTextRange, longCitation);
-		}
-	}
+	insertTOAField(field->doc, &insertRange, shortCitation,
+		longCitation, category, isInitial, smallCapsStyleName);
 }
 
 // Allocates a field structure based on a CField, optionally checking to make
@@ -429,7 +699,8 @@ statusCode __stdcall getText(field_t* field, wchar_t** returnValue) {
 }
 
 // Sets text of this field
-statusCode __stdcall setText(field_t* field, const wchar_t string[], bool isRich) {
+statusCode __stdcall setText(field_t* field, const wchar_t string[], bool isRich,
+							 const wchar_t smallCapsStyleName[]) {
 	HANDLE_EXCEPTIONS_BEGIN
 	setScreenUpdatingStatus(field->doc, false);
 	
@@ -536,7 +807,7 @@ statusCode __stdcall setText(field_t* field, const wchar_t string[], bool isRich
 		}
 
 		if(wcsstr(string, L"\\scaps")) {
-			applyCapsStyleToSmallCaps(field->doc, &field->comContentRange);
+			applyCapsStyleToSmallCaps(field->doc, &field->comContentRange, smallCapsStyleName);
 		}
 	} else {
 		CFont0 comFont = field->comContentRange.get_Font();
@@ -567,13 +838,15 @@ statusCode __stdcall setText(field_t* field, const wchar_t string[], bool isRich
 // Sets Table of Authorities marks inside this field result.
 statusCode __stdcall setTOAMarks(field_t* field, const wchar_t* shortCitations[],
 								 const wchar_t* longCitations[], unsigned short categories[],
-								 bool isInitial[], unsigned long count) {
+								 bool isInitial[], unsigned long count,
+								 const wchar_t smallCapsStyleName[]) {
 	HANDLE_EXCEPTIONS_BEGIN
 	setScreenUpdatingStatus(field->doc, false);
 
 	clearTOAMarks(&field->comContentRange);
 	for(unsigned long i = 0; i < count; i++) {
-		insertTOAMark(field, shortCitations[i], longCitations[i], categories[i], isInitial[i]);
+		insertTOAMark(field, shortCitations[i], longCitations[i], categories[i],
+			isInitial[i], smallCapsStyleName);
 	}
 
 	if(field->comBookmark) {

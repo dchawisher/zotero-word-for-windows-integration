@@ -155,16 +155,17 @@ function init() {
 		// statusCode selectField(Field* field);
 		selectField: lib.declare("selectField", ctypes.stdcall_abi, statusCode, field_t.ptr),
 			
-		// statusCode setText(Field* field, const jschar string[], bool isRich);
+		// statusCode setText(Field* field, const jschar string[], bool isRich,
+		//		const jschar smallCapsStyleName[]);
 		setText: lib.declare("setText", ctypes.stdcall_abi, statusCode, field_t.ptr,
-			ctypes.jschar.ptr, ctypes.bool),
+			ctypes.jschar.ptr, ctypes.bool, ctypes.jschar.ptr),
 
 		// statusCode setTOAMarks(Field* field, const jschar* shortCitations[],
 		//		const jschar* longCitations[], unsigned short categories[],
-		//		bool isInitial[], unsigned long count);
+		//		bool isInitial[], unsigned long count, const jschar smallCapsStyleName[]);
 		setTOAMarks: lib.declare("setTOAMarks", ctypes.stdcall_abi, statusCode, field_t.ptr,
 			ctypes.jschar.ptr.ptr, ctypes.jschar.ptr.ptr, ctypes.unsigned_short.ptr,
-			ctypes.bool.ptr, ctypes.unsigned_long),
+			ctypes.bool.ptr, ctypes.unsigned_long, ctypes.jschar.ptr),
 			
 		// statusCode getText(Field* field, jschar** returnValue);
 		getText: lib.declare("getText", ctypes.stdcall_abi, statusCode, field_t.ptr,
@@ -476,13 +477,13 @@ Field.prototype = {
 		checkStatus(f.selectField(this._field_t));
 	},
 	
-	setText: function(text, isRich) {
+	setText: function(text, isRich, smallCapsStyleName = "") {
 		Zotero.debug("ZoteroWinWordIntegration: setText", 4);
 		checkIfFreed(this._documentStatus);
-		checkStatus(f.setText(this._field_t, text, isRich));
+		checkStatus(f.setText(this._field_t, text, isRich, smallCapsStyleName));
 	},
 
-	setTOAMarks: function(marks) {
+	setTOAMarks: function(marks, smallCapsStyleName = "") {
 		Zotero.debug("ZoteroWinWordIntegration: setTOAMarks", 4);
 		checkIfFreed(this._documentStatus);
 
@@ -497,7 +498,8 @@ Field.prototype = {
 			ctypes.jschar.ptr.array()(longCitations),
 			ctypes.unsigned_short.array()(categories),
 			ctypes.bool.array()(isInitial),
-			marks.length
+			marks.length,
+			smallCapsStyleName
 		));
 	},
 	

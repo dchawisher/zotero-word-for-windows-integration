@@ -273,9 +273,11 @@ extern "C" {
 	__declspec(dllexport) statusCode __stdcall deleteField(field_t* field);
 	__declspec(dllexport) statusCode __stdcall removeCode(field_t* field);
 	__declspec(dllexport) statusCode __stdcall selectField(field_t* field);
-	__declspec(dllexport) statusCode __stdcall setText(field_t* field, const wchar_t string[], bool isRich);
+	__declspec(dllexport) statusCode __stdcall setText(field_t* field, const wchar_t string[], bool isRich,
+		const wchar_t smallCapsStyleName[]);
 	__declspec(dllexport) statusCode __stdcall setTOAMarks(field_t* field, const wchar_t* shortCitations[],
-		const wchar_t* longCitations[], unsigned short categories[], bool isInitial[], unsigned long count);
+		const wchar_t* longCitations[], unsigned short categories[], bool isInitial[], unsigned long count,
+		const wchar_t smallCapsStyleName[]);
 	__declspec(dllexport) statusCode __stdcall getText(field_t* field, wchar_t** returnValue);
 	__declspec(dllexport) statusCode __stdcall setCode(field_t *field, const wchar_t code[]);
 	__declspec(dllexport) statusCode __stdcall getNoteIndex(field_t* field, unsigned long *returnValue);

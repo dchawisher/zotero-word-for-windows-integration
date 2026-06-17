@@ -831,7 +831,7 @@ statusCode __stdcall exportDocument(document_t *doc, const wchar_t fieldType[], 
 	listNode_t *fieldsStart = fields;
 	while (fields != NULL) {
 		field_t *field = (field_t *)fields->value;
-		ENSURE_OK(setText(field, field->code, false));
+		ENSURE_OK(setText(field, field->code, false, L""));
 		ENSURE_OK(removeCode(field));
 		CHyperlinks links = field->comContentRange.get_Hyperlinks();
 		links.Add(field->comContentRange, COleVariant(IMPORT_LINK_URL), covOptional, covOptional, covOptional, covOptional);
