@@ -43,6 +43,10 @@ Sub ZoteroRibbonSetDocPrefs(button As IRibbonControl)
     Call ZoteroSetDocPrefs
 End Sub
 
+Sub ZoteroRibbonCitationExplorer(button As IRibbonControl)
+    Call ZoteroCitationExplorer
+End Sub
+
 Sub ZoteroRibbonRefresh(button As IRibbonControl)
     Call ZoteroRefresh
 End Sub

@@ -11,6 +11,7 @@
           <button id="InsertZoteroNoteButton" label="Add Note" size="large" image="addZoteroNote" onAction="ZoteroRibbon.ZoteroRibbonAddNote" supertip="Insert a new note at the current cursor position" keytip="N"/>
           <separator id="ZoteroSeparator2"/>
           <button id="ZoteroSetDocPrefs" label="Document Preferences" image="zoteroDocPrefs" onAction="ZoteroRibbon.ZoteroRibbonSetDocPrefs" supertip="Change the citation style or locale" keytip="P"/>
+          <button id="ZoteroCitationExplorer" label="Citation Explorer" image="zoteroDocPrefs" onAction="ZoteroRibbon.ZoteroRibbonCitationExplorer" supertip="View and manage citations in this document" keytip="X"/>
           <button id="RefreshZotero" label="Refresh" image="zoteroRefresh" onAction="ZoteroRibbon.ZoteroRibbonRefresh" supertip="Update all citations to reflect changes" keytip="R"/>
           <button id="ZoteroRemoveCodes" label="Unlink Citations" image="zoteroRemoveCodes" onAction="ZoteroRibbon.ZoteroRibbonRemoveCodes" supertip="Remove all Zotero field codes and unlink from Zotero library" keytip="U"/>
         </group>

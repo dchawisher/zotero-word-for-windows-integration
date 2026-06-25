@@ -128,6 +128,10 @@ Public Sub ZoteroSetDocPrefs()
     Call ZoteroCommand("setDocPrefs", True)
 End Sub
 
+Public Sub ZoteroCitationExplorer()
+    Call ZoteroCommand("citationExplorer", True)
+End Sub
+
 Public Sub ZoteroRefresh()
     Call ZoteroCommand("refresh", False)
 End Sub
