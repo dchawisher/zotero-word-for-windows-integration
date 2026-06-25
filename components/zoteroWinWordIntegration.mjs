@@ -129,6 +129,10 @@ function init() {
 		insertText: lib.declare("insertText", ctypes.stdcall_abi, statusCode, document_t.ptr,
 			ctypes.jschar.ptr),
 
+		// statusCode insertTableOfAuthorities(document_t *doc);
+		insertTableOfAuthorities: lib.declare("insertTableOfAuthorities", ctypes.stdcall_abi,
+			statusCode, document_t.ptr),
+
 		// statusCode convertPlaceholdersToFields(document_t *doc, wchar_t* placeholders[],
 		//		unsigned long nPlaceholders, unsigned short noteType, wchar_t fieldType[], listNode_t** returnNode);
 		convertPlaceholdersToFields: lib.declare("convertPlaceholdersToFields", ctypes.stdcall_abi, statusCode, document_t.ptr,
@@ -371,6 +375,12 @@ Document.prototype = {
 		Zotero.debug(`ZoteroWinWordIntegration: insertText`, 4);
 		checkIfFreed(this._documentStatus);
 		checkStatus(f.insertText(this._document_t, text));
+	},
+
+	insertTableOfAuthorities: function() {
+		Zotero.debug(`ZoteroWinWordIntegration: insertTableOfAuthorities`, 4);
+		checkIfFreed(this._documentStatus);
+		checkStatus(f.insertTableOfAuthorities(this._document_t));
 	},
 
 	convertPlaceholdersToFields: async function(placeholderIDs, noteType, fieldType) {

@@ -250,6 +250,7 @@ extern "C" {
 	__declspec(dllexport) statusCode __stdcall exportDocument(document_t *doc, const wchar_t fieldType[], const wchar_t importInstructions[]);
 	__declspec(dllexport) statusCode __stdcall importDocument(document_t *doc, const wchar_t fieldType[], bool* returnValue);
 	__declspec(dllexport) statusCode __stdcall insertText(document_t *doc, const wchar_t htmlString[]);
+	__declspec(dllexport) statusCode __stdcall insertTableOfAuthorities(document_t *doc);
 	__declspec(dllexport) statusCode __stdcall convertPlaceholdersToFields(document_t *doc, const wchar_t* placeholders[], const unsigned long nPlaceholders,
 		const unsigned short noteType, const wchar_t fieldType[], listNode_t** returnNode);
 	__declspec(dllexport) statusCode __stdcall cleanup(document_t *doc);

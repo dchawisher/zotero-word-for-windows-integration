@@ -981,6 +981,47 @@ statusCode __stdcall insertText(document_t *doc, const wchar_t htmlString[]) {
 	HANDLE_EXCEPTIONS_END
 }
 
+statusCode __stdcall insertTableOfAuthorities(document_t *doc) {
+	HANDLE_EXCEPTIONS_BEGIN
+	// Word WdWordDialog.wdDialogInsertTableOfAuthorities
+	const long WD_DIALOG_INSERT_TABLE_OF_AUTHORITIES = 471;
+
+	LPDISPATCH dialogsDispatch = doc->comApp.get_Dialogs();
+	if (!dialogsDispatch) {
+		DIE(L"Could not get Word dialogs collection.");
+	}
+	COleDispatchDriver dialogs(dialogsDispatch);
+	LPDISPATCH dialogDispatch = NULL;
+	static BYTE itemParms[] = VTS_I4;
+	dialogs.InvokeHelper(0x0, DISPATCH_METHOD, VT_DISPATCH, (void*) &dialogDispatch,
+		itemParms, WD_DIALOG_INSERT_TABLE_OF_AUTHORITIES);
+	if (!dialogDispatch) {
+		DIE(L"Could not get Word Insert Table of Authorities dialog.");
+	}
+
+	COleDispatchDriver dialog(dialogDispatch);
+	OLECHAR showName[] = L"Show";
+	LPOLESTR showNames[] = { showName };
+	DISPID showDispid;
+	HRESULT hr = dialog.m_lpDispatch->GetIDsOfNames(IID_NULL, showNames, 1,
+		LOCALE_USER_DEFAULT, &showDispid);
+	if (FAILED(hr)) {
+		DIE(L"Could not resolve Word Insert Table of Authorities dialog.");
+	}
+
+	VARIANT result;
+	VariantInit(&result);
+	DISPPARAMS params = { NULL, NULL, 0, 0 };
+	hr = dialog.m_lpDispatch->Invoke(showDispid, IID_NULL, LOCALE_USER_DEFAULT,
+		DISPATCH_METHOD, &params, &result, NULL, NULL);
+	VariantClear(&result);
+	if (FAILED(hr)) {
+		DIE(L"Could not show Word Insert Table of Authorities dialog.");
+	}
+	return STATUS_OK;
+	HANDLE_EXCEPTIONS_END
+}
+
 statusCode __stdcall convertPlaceholdersToFields(document_t *doc, const wchar_t* placeholders[], const unsigned long nPlaceholders,
 		const unsigned short noteType, const wchar_t fieldType[], listNode_t** returnNode) {
 	HANDLE_EXCEPTIONS_BEGIN
