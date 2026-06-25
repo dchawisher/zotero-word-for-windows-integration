@@ -145,6 +145,61 @@ static void clearTOAMarks(CRange *range) {
 	}
 }
 
+static void removeTextOnce(CString *text, const CString& toRemove) {
+	if(toRemove.IsEmpty()) return;
+	int pos = text->Find(toRemove);
+	if(pos != -1) {
+		text->Delete(pos, toRemove.GetLength());
+	}
+}
+
+static void removeRangeTextOnce(CString *text, CRange range) {
+	removeTextOnce(text, range.get_Text());
+}
+
+static void removeTOAFieldTextOnce(CString *text, CField *field) {
+	try {
+		removeRangeTextOnce(text, field->get_Code());
+	}
+	catch(CException* e) {
+		e->Delete();
+	}
+	try {
+		removeRangeTextOnce(text, field->get_Result());
+	}
+	catch(CException* e) {
+		e->Delete();
+	}
+}
+
+static void removeFieldControlChars(CString *text) {
+	for(int i = text->GetLength() - 1; i >= 0; i--) {
+		wchar_t ch = text->GetAt(i);
+		if(ch == L'\x13' || ch == L'\x14' || ch == L'\x15') {
+			text->Delete(i, 1);
+		}
+	}
+}
+
+static CString getTextWithoutTOAMarks(CRange *range) {
+	CString text = range->get_Text();
+	CFields fields = range->get_Fields();
+	long count = fields.get_Count();
+	bool removedTOAMark = false;
+	for(long i = count; i >= 1; i--) {
+		CField nestedField = fields.Item(i);
+		if(nestedField.get_Type() != WD_FIELD_TOA_ENTRY) {
+			continue;
+		}
+		removedTOAMark = true;
+		removeTOAFieldTextOnce(&text, &nestedField);
+	}
+	if(removedTOAMark) {
+		removeFieldControlChars(&text);
+	}
+	return text;
+}
+
 struct TOAFormatState {
 	bool bold;
 	bool italic;
@@ -207,6 +262,28 @@ static void appendTOAChar(TOAFormattedText *formatted, wchar_t ch, const TOAForm
 	formatted->runs.push_back(run);
 }
 
+static void appendTOALineBreak(TOAFormattedText *formatted, const TOAFormatState& state) {
+	long length = formatted->text.GetLength();
+	if(length == 0 || formatted->text[length - 1] == L'\v') return;
+	appendTOAChar(formatted, L'\v', state);
+}
+
+static void trimTOATrailingLineBreaks(TOAFormattedText *formatted) {
+	while(!formatted->text.IsEmpty()) {
+		long length = formatted->text.GetLength();
+		wchar_t ch = formatted->text[length - 1];
+		if(ch != L'\v' && ch != L' ' && ch != L'\t') break;
+		formatted->text.Truncate(length - 1);
+	}
+
+	while(!formatted->runs.empty() && formatted->runs.back().start >= formatted->text.GetLength()) {
+		formatted->runs.pop_back();
+	}
+	if(!formatted->runs.empty() && formatted->runs.back().end > formatted->text.GetLength()) {
+		formatted->runs.back().end = formatted->text.GetLength();
+	}
+}
+
 static TOAFormattedText parseTOARTF(const wchar_t string[]) {
 	TOAFormattedText formatted;
 	TOAFormatState state;
@@ -224,6 +301,9 @@ static TOAFormattedText parseTOARTF(const wchar_t string[]) {
 				state = stack.back();
 				stack.pop_back();
 			}
+			continue;
+		}
+		if(ch == L'\r' || ch == L'\n') {
 			continue;
 		}
 		if(ch != L'\\') {
@@ -260,7 +340,7 @@ static TOAFormattedText parseTOARTF(const wchar_t string[]) {
 		}
 		if(negative) number = -number;
 
-		if(i < length && string[i] == L' ') {
+		if(i < length && (string[i] == L' ' || string[i] == L'\r' || string[i] == L'\n')) {
 			// Control-word delimiter, not literal text.
 		}
 		else {
@@ -311,7 +391,7 @@ static TOAFormattedText parseTOARTF(const wchar_t string[]) {
 			continue;
 		}
 		if(control == L"line" || control == L"par") {
-			appendTOAChar(&formatted, L'\v', state);
+			appendTOALineBreak(&formatted, state);
 			continue;
 		}
 		if(control == L"u" && hasNumber) {
@@ -323,6 +403,7 @@ static TOAFormattedText parseTOARTF(const wchar_t string[]) {
 		}
 	}
 
+	trimTOATrailingLineBreaks(&formatted);
 	return formatted;
 }
 
@@ -692,7 +773,7 @@ statusCode __stdcall removeCode(field_t* field) {
 // Gets text inside this field. DO NOT FREE THE RETURN VALUE!
 statusCode __stdcall getText(field_t* field, wchar_t** returnValue) {
 	HANDLE_EXCEPTIONS_BEGIN
-	CString fieldText = field->comContentRange.get_Text();
+	CString fieldText = getTextWithoutTOAMarks(&field->comContentRange);
 	*returnValue = field->text = _wcsdup(fieldText);
 	return STATUS_OK;
 	HANDLE_EXCEPTIONS_END
