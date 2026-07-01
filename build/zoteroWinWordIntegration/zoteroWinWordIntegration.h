@@ -1,6 +1,6 @@
 /*
 	***** BEGIN LICENSE BLOCK *****
-	
+
 	Copyright (c) 2009-2012  Zotero
 	                         Center for History and New Media
 						     George Mason University, Fairfax, Virginia, USA
@@ -86,7 +86,7 @@ enum NOTE_TYPE {
 #define MAX_PROPERTY_LENGTH 255
 #define FIELD_PLACEHOLDER L"{Citation}"
 #define BOOKMARK_REFERENCE_PROPERTY L"ZOTERO_BREF"
-#define UNDO_RECORD_NAME L"Zotero Command"
+#define UNDO_RECORD_NAME L"Citate Command"
 #define RTF_TEMP_BOOKMARK L"ZOTERO_TEMP_BOOKMARK"
 #define PREFS_PROPERTY L"ZOTERO_PREF"
 #define BOOKMARK_PREFIX L"ZOTERO_"
@@ -148,7 +148,7 @@ typedef struct Document {
 	bool statusScreenUpdating;
 	bool restoreTrackChanges;
 	short insertTextIntoNote;
-	
+
 	listNode_t* allocatedFieldsStart;
 	listNode_t* allocatedFieldsEnd;
 	listNode_t* allocatedFieldListsStart;
@@ -158,38 +158,38 @@ typedef struct Document {
 typedef struct Field {
 	// The field code
 	wchar_t* code;
-	
+
 	// The field text
 	wchar_t* text;
-	
+
 	// The note type (0, NOTE_FOOTNOTE, or NOTE_ENDNOTE)
 	short noteType;
-	
+
 	// The bookmark name
 	wchar_t* bookmarkName;
-	
+
 	// The location of this field relative to the start of the main body text.
 	// For a footnote, this would be the position of the superscripted note
 	// reference.
 	long textLocation;
-	
+
 	// The location of this field relative to the start of the footnote/endnote
 	// story.
 	long noteLocation;
 
 	// Whether this field is adjacent to the next field
 	bool adjacent;
-	
+
 	// Only one of these will be set
 	CField comField;
 	CBookmark0 comBookmark;
-	
+
 	// The corresponding document
 	document_t* doc;
-	
+
 	// The range corresponding to the field code, for a field
 	CRange comCodeRange;
-	
+
 	// The range corresponding to the content of a field
 	CRange comContentRange;
 
@@ -243,7 +243,7 @@ extern "C" {
 						                                 listNode_t** returnNode);
 	__declspec(dllexport) statusCode __stdcall convert(document_t *doc, field_t* fields[], unsigned long nFields,
 					                                   const wchar_t toFieldType[], unsigned short noteType[]);
-	__declspec(dllexport) statusCode __stdcall setBibliographyStyle(document_t *doc, long firstLineIndent, 
+	__declspec(dllexport) statusCode __stdcall setBibliographyStyle(document_t *doc, long firstLineIndent,
 									                                long bodyIndent, unsigned long lineSpacing,
 	                                                                unsigned long entrySpacing, long tabStops[],
 									                                unsigned long tabStopCount);

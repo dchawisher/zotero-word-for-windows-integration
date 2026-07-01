@@ -2,18 +2,18 @@
 
 set -e
 
-# --- Unpack Zotero.dotm if it was modified ---
+# --- Unpack Citate.dotm if it was modified ---
 
-if git diff --cached --name-only | grep -q '^install/Zotero\.dotm$'; then
+if git diff --cached --name-only | grep -q '^install/Citate\.dotm$'; then
 	REPO_ROOT="$(git rev-parse --show-toplevel)"
 	UNPACK_SCRIPT="$REPO_ROOT/build/template/unpack_templates.sh"
 
 	if [ ! -x "$UNPACK_SCRIPT" ]; then
 		echo "Warning: $UNPACK_SCRIPT not found or not executable, skipping unpack" >&2
 	else
-		echo "install/Zotero.dotm changed — running unpack_templates.sh..."
+		echo "install/Citate.dotm changed — running unpack_templates.sh..."
 		"$UNPACK_SCRIPT"
-		git add "$REPO_ROOT/build/template/Zotero.dotm/"
+		git add "$REPO_ROOT/build/template/Citate.dotm/"
 		echo "Unpacked template files staged."
 	fi
 fi

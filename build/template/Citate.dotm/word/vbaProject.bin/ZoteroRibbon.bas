@@ -59,8 +59,8 @@ Sub ZoteroTabLabel(tb As IRibbonControl, ByRef returnedVal)
     Dim ver As Double
     ver = Val(Application.Version)
     If ver >= 15 And ver < 16 Then
-        returnedVal = "ZOTERO"
+        returnedVal = "CITATE"
     Else
-        returnedVal = "Zotero"
+        returnedVal = "Citate"
     End If
 End Sub

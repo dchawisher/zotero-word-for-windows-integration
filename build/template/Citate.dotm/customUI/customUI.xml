@@ -3,7 +3,7 @@
   <ribbon>
     <tabs>
       <tab id="ZoteroTab" getLabel="ZoteroRibbon.ZoteroTabLabel" insertBeforeMso="TabAddIns" keytip="C">
-        <group id="ZoteroGroup" image="zoteroz16" label="Zotero">
+        <group id="ZoteroGroup" image="zoteroz16" label="Citate">
           <button id="InsertZoteroCitationButton" label="Add/Edit Citation" size="large" image="addEditZoteroCitation" onAction="ZoteroRibbon.ZoteroRibbonAddEditCitation" supertip="Insert a new citation, or edit the citation at the current cursor position" keytip="C"/>
           <button id="InsertZoteroBibliographyButton" label="Document Tools" size="large" image="addEditZoteroBibliography" onAction="ZoteroRibbon.ZoteroRibbonAddEditBibliography" supertip="Manage document citations, authorities, bibliography, and preferences" keytip="B"/>
           <separator id="ZoteroSeparator1"/>
@@ -13,7 +13,7 @@
           <button id="ZoteroSetDocPrefs" label="Document Preferences" image="zoteroDocPrefs" onAction="ZoteroRibbon.ZoteroRibbonSetDocPrefs" supertip="Change the citation style or locale" keytip="P"/>
           <button id="ZoteroCitationExplorer" label="Citation Explorer" image="zoteroDocPrefs" onAction="ZoteroRibbon.ZoteroRibbonCitationExplorer" supertip="View and manage citations in this document" keytip="X"/>
           <button id="RefreshZotero" label="Refresh" image="zoteroRefresh" onAction="ZoteroRibbon.ZoteroRibbonRefresh" supertip="Update all citations to reflect changes" keytip="R"/>
-          <button id="ZoteroRemoveCodes" label="Unlink Citations" image="zoteroRemoveCodes" onAction="ZoteroRibbon.ZoteroRibbonRemoveCodes" supertip="Remove all Zotero field codes and unlink from Zotero library" keytip="U"/>
+          <button id="ZoteroRemoveCodes" label="Unlink Citations" image="zoteroRemoveCodes" onAction="ZoteroRibbon.ZoteroRibbonRemoveCodes" supertip="Remove all Citate field codes and unlink from Citate library" keytip="U"/>
         </group>
       </tab>
     </tabs>

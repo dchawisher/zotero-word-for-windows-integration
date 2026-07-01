@@ -34,7 +34,7 @@ export var Installer = function(failSilently, force) {
 };
 
 var Plugin = new (function() {
-	this.EXTENSION_STRING = "Zotero Word for Windows Integration";
+	this.EXTENSION_STRING = "Citate Word for Windows Integration";
 	this.EXTENSION_ID = "zoteroWinWordIntegration@zotero.org";
 	this.EXTENSION_PREF_BRANCH = "extensions.zoteroWinWordIntegration.";
 	this.EXTENSION_DIR = "zotero-winword-integration";
@@ -46,11 +46,11 @@ var Plugin = new (function() {
 	var zoteroPluginInstaller;
 	
 	this.install = async function(zpi) {
-		// get Zotero.dot file
+		// get Citate.dot file
 		let dotm = FileUtils.getDir('AChrom', []).parent.parent;
 		dotm.append('integration');
 		dotm.append('word-for-windows');
-		dotm.append("Zotero.dotm");
+		dotm.append("Citate.dotm");
 
 		// find Word Startup folders (see http://support.microsoft.com/kb/210860)
 		var appData = Components.classes["@mozilla.org/file/directory_service;1"]
@@ -168,32 +168,34 @@ var Plugin = new (function() {
 			if (installedAt.has(startupFolder.path)) continue;
 			installedAt.add(startupFolder.path);
 			
-			var oldDot = startupFolder.clone().QueryInterface(Components.interfaces.nsIFile);
-			var oldDotm = oldDot.clone();
-			oldDot.append("Zotero.dot");
-			oldDotm.append("Zotero.dotm");
-
-			for(var template of [oldDot, oldDotm]) {
+			var oldTemplateNames = [
+				{ name: "Citate.dot", required: false },
+				{ name: "Citate.dotm", required: true },
+				{ name: "Zotero.dot", required: false },
+				{ name: "Zotero.dotm", required: false }
+			];
+			for (var oldTemplate of oldTemplateNames) {
+				var template = startupFolder.clone().QueryInterface(Components.interfaces.nsIFile);
+				template.append(oldTemplate.name);
 				if(template.exists()) {
 					try {
 						template.remove(false);
 					} catch(e) {
 						Zotero.debug(e);
-						// Non-fatal if we cannot remove the .dot file since we're only
-						// removing it to take out our own trash
-						if (template === oldDotm) {
+						if (oldTemplate.required) {
 							throw new Error("Could not remove "+template.path);
 						}
+						Zotero.debug(`Could not remove legacy Word template ${template.path}; continuing`);
 					}
 				}
 			}
 
-			// copy Zotero.dotm file to Word Startup folder
+			// copy Citate.dotm file to Word Startup folder
 			try {
-				dotm.copyTo(startupFolder, "Zotero.dotm");
+				dotm.copyTo(startupFolder, "Citate.dotm");
 			} catch (e) {
 				Zotero.debug(e, 1);
-				throw new Error(`Could not copy Zotero.dotm to ${startupFolder.path}`)
+				throw new Error(`Could not copy Citate.dotm to ${startupFolder.path}`)
 			}
 		}
 

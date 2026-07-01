@@ -236,7 +236,7 @@ const DECODE_MAPPINGS = {
 
 var Application = function() {};
 Application.prototype = {
-	classDescription: "Zotero Word for Windows Integration Application",
+	classDescription: "Citate Word for Windows Integration Application",
 	getDocument: async function(documentName) {
 		init();
 		var docPtr = new document_t.ptr();
